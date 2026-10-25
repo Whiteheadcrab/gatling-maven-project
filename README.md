@@ -1,59 +1,37 @@
-# Gatling Maven Demo
+﻿# Gatling Maven Demo
 
-A first Java simulation based on the [official Gatling Maven demo](https://github.com/gatling/gatling-maven-plugin-demo-java).
+This project sends `GET https://jsonplaceholder.typicode.com/posts/1` to [JSONPlaceholder](https://jsonplaceholder.typicode.com/), a free practice API with no account or API key. The response contains `id`, `userId`, `title`, and `body`.
 
-Requires JDK 17 or later and Maven 3.9 or later. Run commands from the project root.
+## 1. Prepare your environment
 
-## Run the demo
+You need JDK 17 or later, Maven 3.9 or later, and internet access. Open the project in IntelliJ IDEA. Reload the Maven project after changing `pom.xml`.
 
-```powershell
-mvn gatling:test "-Dgatling.simulationClass=example.BasicSimulation"
-```
-
-The simulation sends one virtual user to `GET https://api-ecomm.gatling.io/session`.
-It fails if any request fails. This command makes requests to Gatling's public demo API.
-
-To change the number of virtual users:
+Open IntelliJ's Terminal and run these PowerShell commands:
 
 ```powershell
-mvn gatling:test "-Dgatling.simulationClass=example.BasicSimulation" "-Dvu=5"
+Set-Location 'E:\Repositories\IntelliJ Idea\gatling-maven-project'
+java -version
+mvn -version
 ```
 
-After a run, open `target/gatling/<run-directory>/index.html` for the HTML report.
+Check that Maven reports Java 17 or later. The POM already contains Gatling and its Maven plugin. Maven downloads dependencies on the first run; no separate Gatling installation is needed.
 
-## Try a free practice API
+## 2. Run the recorded test
 
-[JSONPlaceholder](https://jsonplaceholder.typicode.com/) is a free fake REST API with no signup or API key.
-The example reads one sample post:
-
-```http
-GET https://jsonplaceholder.typicode.com/posts/1
-Accept: application/json
-```
-
-Open `requests/jsonplaceholder.http` in IntelliJ IDEA and click the run icon beside the request
-(requires the IDE's HTTP Client support). It checks HTTP 200 and that `id` and `userId` are both 1.
-You can also send the request from PowerShell:
+Run from the project root, where `pom.xml` is located:
 
 ```powershell
-Invoke-RestMethod https://jsonplaceholder.typicode.com/posts/1
+mvn gatling:test "-Dgatling.simulationClass=org.example.RecordedSimulation"
 ```
 
-Run the same request in Gatling with one virtual user:
+This executes [RecordedSimulation.java](src/test/java/org/example/RecordedSimulation.java):
 
-```powershell
-mvn gatling:test "-Dgatling.simulationClass=example.JsonPlaceholderSimulation"
-```
+1. Connect to `https://jsonplaceholder.typicode.com`.
+2. Send `GET /posts/1`, named `request_0` in the report.
+3. Run once with one virtual user, configured by `atOnceUsers(1)`.
+4. Generate an HTML report.
 
-Edit `src/test/java/example/JsonPlaceholderSimulation.java` to change the request or its checks.
-This example sends a single request to the public service for practice.
-
-## Edit the demo
-
-- `pom.xml`: dependency, plugin versions, and Java compiler settings.
-- `src/test/java/example/BasicSimulation.java`: HTTP protocol, scenario, virtual users, and assertion.
-- `src/test/resources/gatling.conf`: Gatling configuration overrides.
-- `src/test/resources/logback-test.xml`: logging configuration, including optional HTTP request debugging.
+The Recorder can be closed. Gatling executes the Java simulation; it does not read the HAR file during the test.
 
 To compile without sending HTTP requests:
 
@@ -61,4 +39,187 @@ To compile without sending HTTP requests:
 mvn test-compile
 ```
 
-The files under `src/main/resources/archetype-resources` are the original Maven archetype templates; executable simulations belong under `src/test/java`.
+Use `gatling:test` to execute these scenarios. Plain `mvn test` does not execute Gatling simulations with the current POM.
+
+## 3. Open and understand the report
+
+The terminal prints a link to the report at the end of the run. Open it in a browser:
+
+```text
+target/gatling/recordedsimulation-<timestamp>/index.html
+```
+
+Each run creates a new timestamped folder. `target` is generated output, ignored by Git. Running `mvn clean` removes it, including old reports.
+
+| Field | Meaning for this test |
+|---|---|
+| Total | Expected: 1 request |
+| OK | Expected: 1 successful request |
+| KO | Expected: 0 failed requests |
+| Response time | Time taken to receive the response, in milliseconds |
+| Percentiles | All equal for one request; useful with many samples |
+
+The first recorded run returned 1 OK, 0 KO, and a response time of 432 ms. Future times will vary. One request confirms the scenario works; it does not establish performance under load.
+
+The generated test currently uses Gatling's default HTTP status check (2xx or 304). It does not validate the JSON body. It also has no assertions that make Maven fail when requests fail. Inspect the report's KO count, or add the assertion in section 5.
+
+## 4. Project files
+
+| File or folder | Purpose |
+|---|---|
+| [pom.xml](pom.xml) | Java compiler settings, Gatling dependency, and Maven plugins |
+| [RecordedSimulation.java](src/test/java/org/example/RecordedSimulation.java) | Runnable test generated by the Recorder |
+| [recordings/jsonplaceholder.typicode.com.har](recordings/jsonplaceholder.typicode.com.har) | Original browser recording used to generate the test |
+| [requests/jsonplaceholder.http](requests/jsonplaceholder.http) | Request you can run manually in IntelliJ's HTTP Client |
+| [JsonPlaceholderSimulation.java](src/test/java/example/JsonPlaceholderSimulation.java) | Short handwritten JSONPlaceholder test |
+| [BasicSimulation.java](src/test/java/example/BasicSimulation.java) | Original demo against Gatling's e-commerce API |
+| [gatling.conf](src/test/resources/gatling.conf) | Gatling settings and report data output |
+| [logback-test.xml](src/test/resources/logback-test.xml) | Logging settings |
+| `target/gatling/` | Generated HTML reports |
+
+Files under `src/main/resources/archetype-resources` are original Maven archetype templates. Put runnable simulations under `src/test/java`.
+
+## 5. Change the existing test
+
+For small changes, edit `RecordedSimulation.java` directly, save it, and run the same command again. A new HAR recording is not required.
+
+### Change the request
+
+Change `.get("/posts/1")` to `.get("/posts/2")` to fetch another post. The host comes from `.baseUrl("https://jsonplaceholder.typicode.com")`.
+
+Rename `http("request_0")` to something readable, such as `http("Get post 2")`. That name appears in the report.
+
+### Add response checks
+
+For the original post 1 request, replace the request inside `.exec(...)` with:
+
+```java
+http("Get post 1")
+    .get("/posts/1")
+    .headers(headers_0)
+    .check(
+        status().is(200),
+        jsonPath("$.id").ofInt().is(1)
+    )
+```
+
+This checks HTTP 200 and that the returned post ID is 1. If you switch to `/posts/2`, change the expected ID to 2. Required static imports already exist in the generated class.
+
+To make Maven fail if any request or check fails, replace the existing `setUp(...)` line with:
+
+```java
+setUp(scn.injectOpen(atOnceUsers(1)))
+    .protocols(httpProtocol)
+    .assertions(global().failedRequests().count().is(0L));
+```
+
+A check validates an individual response. This assertion requires zero failed requests across the run.
+
+### Change the number of users
+
+`atOnceUsers(1)` starts one virtual user. Each user executes the scenario once. Keep this public API practice example at one user. For a service you own or have permission to load test, change the number to adjust the workload.
+
+Adding `-Dvu=5` to the recorded test command will not change its user count: this class uses a literal `1` and does not read the `vu` property.
+
+### Add a second request to the same journey
+
+To read a post and then its comments, replace the existing `scn` declaration with:
+
+```java
+private ScenarioBuilder scn = scenario("Read a post and its comments")
+    .exec(http("Get post 1").get("/posts/1").check(status().is(200)))
+    .pause(1)
+    .exec(http("Get comments").get("/posts/1/comments").check(status().is(200)));
+```
+
+The pause is one second. One user now sends two requests in sequence.
+
+## 6. Record or update a browser journey
+
+Use a new recording when you want to capture a different sequence of browser actions.
+
+1. Open Chrome and press **F12**. Select **Network**.
+2. Select **All**, check **Preserve log** (or **Keep log**) and **Disable cache**, and clear the request list.
+3. Visit `https://jsonplaceholder.typicode.com/posts/1` with DevTools open. Reload if necessary.
+4. Filter by `/posts/1`. Expect a request named `1`, status `200`, type `document`. Selecting only **Fetch/XHR** hides it because you opened the URL directly.
+5. Export with **Save all listed as HAR (sanitized)** or the **Export HAR** button. Save under `recordings/` in this project. Use a descriptive new filename for another journey.
+6. Launch the Recorder from the project root:
+
+   ```powershell
+   mvn gatling:recorder
+   ```
+
+7. Configure the Recorder:
+
+   | Setting | Value |
+   |---|---|
+   | Recorder mode | HAR Converter |
+   | HAR file | Select your file under `recordings/` |
+   | Package | `org.example` |
+   | Class name | `RecordedSimulationV2` for an updated recording |
+   | Format | Java 17 |
+   | Simulations folder | This project's `src/test/java` folder |
+   | Encoding | UTF-8 |
+   | Infer HTML resources? | Unchecked for this JSON API |
+   | Save & check response bodies? | Unchecked to keep the code simple |
+   | Enable Filters | Unchecked when the HAR contains only the desired request |
+
+8. Click **Start!**. Check for `src/test/java/org/example/RecordedSimulationV2.java` in IntelliJ.
+9. Close Recorder to free the terminal, or use a second terminal.
+10. Review the generated URLs, requests, and user count. Add checks if needed, then run:
+
+    ```powershell
+    mvn gatling:test "-Dgatling.simulationClass=org.example.RecordedSimulationV2"
+    ```
+
+Generate updates under a new class name first so you can compare them with your edited test. Generating over the original file can replace manual changes.
+
+Changing a HAR file alone does not update an existing Java simulation; convert it again to generate new code. The Recorder captures HTTP traffic; it does not automatically create checks for your business requirements.
+
+## 7. Add similar tests
+
+For another independent API test, copy `RecordedSimulation.java` or generate a new class with Recorder. For example:
+
+1. Create `src/test/java/org/example/GetCommentsSimulation.java`.
+2. Keep `package org.example;` and rename the public class to `GetCommentsSimulation` to match the filename.
+3. Change the scenario name, request name, and endpoint, for example to `/posts/1/comments`.
+4. Update checks to match the response. Comments return a JSON array, so remove or change the single post's `$.id` check if you copied it.
+5. Keep one user for the first run.
+6. Run the new class explicitly:
+
+   ```powershell
+   mvn gatling:test "-Dgatling.simulationClass=org.example.GetCommentsSimulation"
+   ```
+
+7. Inspect the new report. Save the corresponding HAR under `recordings/` if you used Recorder.
+
+Use several requests in one scenario for one user journey. Use a separate simulation class when you want to run and report on a test independently. Additional HTTP simulations can reuse the existing POM dependencies.
+
+Run `mvn gatling:test` locally to choose among simulations interactively. For repeatable commands, pass the full package and class name as above.
+
+The existing shorter examples can also be run explicitly:
+
+```powershell
+mvn gatling:test "-Dgatling.simulationClass=example.JsonPlaceholderSimulation"
+mvn gatling:test "-Dgatling.simulationClass=example.BasicSimulation"
+```
+
+## 8. Common problems
+
+| Problem | What to check |
+|---|---|
+| No request in Chrome Network | Select **All**, open DevTools before navigating, and reload |
+| Terminal occupied by Recorder | Close it after conversion or use another terminal |
+| Simulation cannot be found | Check package, class name, and location under `src/test/java`; run `mvn test-compile` |
+| Multiple simulations available | Pass `-Dgatling.simulationClass=org.example.RecordedSimulation` |
+| Java compilation fails | Check Maven uses JDK 17 or later and filename matches public class name |
+| KO requests | Open request details in the report; inspect errors, endpoint, and expected values |
+| Report shows an old request | Open the newest timestamped report and confirm you ran the intended class |
+
+## References
+
+- [Gatling Maven plugin](https://docs.gatling.io/integrations/build-tools/maven-plugin/)
+- [Gatling Recorder and HAR conversion](https://docs.gatling.io/reference/script/http/recorder/)
+- [Gatling HTTP checks](https://docs.gatling.io/reference/script/http/checks/)
+- [JSONPlaceholder examples](https://jsonplaceholder.typicode.com/)
+- [Official Gatling Java demo](https://github.com/gatling/gatling-maven-plugin-demo-java)

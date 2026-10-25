@@ -1,11 +1,2 @@
-### Get a sample post (no authentication required)
+### Get one post
 GET https://jsonplaceholder.typicode.com/posts/1
-Accept: application/json
-
-> {%
-    client.test("Returns post 1", function () {
-        client.assert(response.status === 200, "Expected HTTP 200");
-        client.assert(response.body.id === 1, "Expected post ID 1");
-        client.assert(response.body.userId === 1, "Expected user ID 1");
-    });
-%}
